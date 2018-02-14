@@ -1,0 +1,364 @@
+/**************************************************************************************/
+/**************************************************************************************/
+/****************  TFG INGEIERIA ELECTRONICA DE TELECOMUNCACIONS  *********************/
+/****************         UNIVERSITAT ATONOMA DE BARCELONA        *********************/
+/**************************************************************************************/
+/**************************************************************************************/
+/*
+Autor     : Cristian Perez Llurba
+DataInici : 22/10/2017
+DataFinal : 15/01/2018
+
+-- INDEX -------------------------------------------------------------------------
+~ DESCRIPIO DE VARIABLES
+  1.0 Libreriras
+  2.0 Entrada Analogica Sensores
+    2.1 Variables Termistor NTC (S&H)
+    2.2 Entradas Sensores NTC
+    2.3 Variables Control Grafic Temperatura
+    2.4 Variable Perltier
+  3.0 Pines Configuracion RGB (indicador estado temperatura)
+  4.0 Pantalla LCD 16x2
+  5.0 Control del funcionament Logic PID  
+
+~ CODI
+  1.0. Configuració dels estats de funcionament (Inputs/Outputs)
+    1.1. Baudios per simbol
+    1.2. INPUTS
+    1.3. OUTPUTS
+      1.3.0. Sortida Control Relé
+      1.3.1. Sortida Control Alarma
+      1.3.2. Sortida Control RPM Motor
+      1.3.3. Sortida pin's RGB
+  2.0. Programa Principal (main)
+
+~ FUNCIONES Y METODOS
+  1.0 Change Color With Function
+  2.0 Automatical Activation of Ventilador
+  3.0 Automatic Activation of Temperature Alarm 
+----------------------------------------------------------------------------------
+
+
+/*==============================================================================*/
+/*===================== DESCRIPIO DE VARIABLES =================================*/
+/*==============================================================================*/
+/* 1.0 Libreriras
+  Libreries necesaries per aquest projecte Harbesten*/
+  #include <math.h>
+  #include <Wire.h> 
+  #include <LiquidCrystal_I2C.h>
+  #include <TimerOne.h>
+
+/* 2.0 Entrada Analogica Sensores*/ 
+  const int R1hot                 = 10000;         //Valor de la resistencia
+  const int R1cold                = 10000;         //Valor de la resistencia
+  const int Vcc                   = 5;             //Tensio Alimentació Control
+
+/* 2.1 Variables Termistor NTC (S&H)*/
+      float A                     = 0.8511839802e-3;
+      float B                     = 2.606091443e-4;
+      float C                     = 1.312317359e-7;
+      float K                     = 8;             //factor de disipacion en mW/C
+      
+/*2.2 Entradas Sensores NTC*/
+      const int SensorFaceHot     = A0;            //Sensor input cara calenta
+      const int SensorFaceCold    = A1;            //Sensor input cara freda
+
+/*2.2 Sensor refrigeración  */
+    const int SensorRadiador      = A3;              //Sensor del radiador
+    int   lecturaDisipador        = 0;               //variable donde se almacenaran datos del sensor (0 - 255)
+    float voltajeLecturaDisipador = 0;
+    float tempDisipador           = 0;  
+    
+/*2.3 Variables Control Grafic Temperatura*/
+      boolean tin80               = false;         //Indica el periode de calentament inicial
+      boolean tin45               = false;         //Indica el periode de refredament inicial
+      boolean thot                = false;         //Temps d'estancia sobre la cara calenta (160ºC)
+      int countTHot               = 0;             //Temps d'estancia cara calenta. Contador 
+                                                   //comptador inizialitzat a cero.
+      int countTCold              = 0;             // Temps d'estancia cara freda.
+                                                
+  /*2.4 Variable Perltier*/
+      const int SensorPeltier     = A2;            //Sensor celu.la peltier 
+      
+/*3.0 Pines Configuracion RGB (indicador estado temperatura)*/
+  const int Red                   = 11;             //rgb pin 9 arduino
+  const int Green                 = 10;            //rgb pin 10 arduino
+  const int Blue                  = 9;            //rgb pin  11 arduino
+
+/* .0 Estado ventilador */
+  const int VentiladorOFF         = 4;
+  const int VentiladorON           = 2;
+  const int VentiladorTranscruso  = 7;
+
+/*4.0 Pantalla LCD 16x2 */
+  const int InputP1               = A4;             //Pantalla LCD 16x2
+  const int InputP2               = A5;             //Pantalla LCD 16x2
+  LiquidCrystal_I2C lcd(0x3f,16,2);                 // Inicia el LCD en la dirección 0x27, con 16 caracteres y 2 líneas*/
+  
+/*5.0 Control del funcionament Logic PID*/
+  boolean SetVentildor            = false;          //Indica si el ventilador s'ençen
+  boolean SetBotzina              = false;          //Indica si la botzina s'ençen
+  const int Alarm                 = 12;             //Avisador Acustic (botzina)  
+  const int pwmMotorRefr          = 3;              //Controlador de la regulació de gir moto Ventilador
+
+/* Control Potencia sortida celula peltier */
+  const int PID                   = 6;              // Regulacio Potencia Celula Pletier
+
+/* Regrifaracion cara caliente*/
+  const int RefrigeracionLimite   = 5;              // Refrigeracion EXTREMA para no superar los 70ºC 
+    
+  const int espera                = 500;
+  const int esperaBotzina         = 50;
+  const int esperaBotzinaCritico  = 100;
+/*========================================================================================*/
+
+/*1.0. Configuració dels ports d'entrada/sortida */
+void setup()  
+{
+  /*1.1. Baudios per simbol */
+  Serial.begin(9600);
+  
+  /*1.2. INPUTS  */
+  /* Les entrades analogiques del arduino */
+  /*1.3. OUTPUTS */
+  
+    /*1.3.0. Sortida Control Alarma*/ 
+      pinMode(VentiladorOFF,OUTPUT);
+      pinMode(VentiladorON,OUTPUT);
+      pinMode(VentiladorTranscruso,OUTPUT);
+      
+    /*1.3.1. Sortida Control Alarma*/ 
+      pinMode(Alarm,OUTPUT);
+      
+    /*1.3.2. Sortida Control RPM Motor*/
+      pinMode(pwmMotorRefr,OUTPUT);
+      pinMode(RefrigeracionLimite,OUTPUT);
+
+    /*1.3.3. Sortida pin's RGB */
+      pinMode(Red,OUTPUT); 
+      pinMode(Green,OUTPUT);
+      pinMode(Blue,OUTPUT);
+
+    /* Control PID */
+      pinMode(PID,OUTPUT);
+    
+    /*LCD*/
+      lcd.init();                                   // Inicializamos el lcd
+      lcd.backlight();                              // Activación luz lcd
+}
+/*====================================================================================*/
+/*========================== Programa Principal ======================================*/
+/*====================================================================================*/
+/*1.1. Programa Principal (main)*/ 
+void loop(){
+/*------- Tension salida celula Peltier ----------------------------------------------*/  
+  float rawPer    = analogRead(SensorPeltier);
+  float VPerTest  = (rawPer/1024*Vcc);
+  int   VPer      = VPerTest*100; 
+/*------------------------------------------------------------------------------------*/  
+
+/*------- Parametros de los sensores -------------------------------------------------*/    
+  float rawHot    = analogRead(SensorFaceHot);
+  float Vhot      =  rawHot / 1024 * Vcc;
+  float R2hot     = (R1hot * Vhot) / (Vcc - Vhot);
+ 
+  float logR2hot  = log(R2hot);
+  float R_th_Hot  = 1.0/((A)+(B*logR2hot)+(C*logR2hot*logR2hot*logR2hot));
+ 
+  float kelvinHot = R_th_Hot - Vhot*Vhot/(K * R2hot)*1000;
+  float celsiusHot= kelvinHot - 273.15;
+  const int celsiusHotADC = celsiusHot*100;
+
+  float rawCold   = analogRead(SensorFaceCold);
+  float Vcold     =  rawCold / 1024 * Vcc;
+  float R2cold    = (R1cold * Vcold) / (Vcc - Vcold);
+ 
+  float logR2cold  = log(R2cold);
+  float R_th_Cold  = 1.0/((A)+(B*logR2cold)+(C*logR2cold*logR2cold*logR2cold));
+ 
+  float kelvinCold = R_th_Cold - Vcold*Vcold/(K * R2cold)*1000;
+  float celsiusCold = kelvinCold - 273.15; 
+  const int celsiusColdADC = celsiusCold*100;
+/*------------------------------------------------------------------------------*/
+
+/*------- Sensor Temepratura Refrigeración ------------------------------------*/
+lecturaDisipador = analogRead(SensorRadiador);      //Lectura del sensor en un rango de 0 a 1023
+voltajeLecturaDisipador = 5.0 / 1024 * lecturaDisipador;
+tempDisipador = voltajeLecturaDisipador * 100;
+/*-----------------------------------------------------------------------------*/
+
+/*------- Informacion bus serie -------------------------------------------------*/
+  Serial.print(celsiusHotADC);
+  Serial.print(",");
+  Serial.print(celsiusColdADC);
+  Serial.print(",");
+  Serial.println(VPer);
+/*------------------------------------------------------------------------------*/
+
+/*------- Control automatico de la refrigeración -------------------------------*/
+  SetVentildor  = SetTemperature(celsiusCold); 
+  SetBotzina    = SetStatusCelPertier(celsiusHot); 
+  /*mira el lado caliente de la celula peltier, ya que este alcanzara antes 
+   la temperatura permitida (210ºC)*/
+  
+  digitalWrite(VentiladorOFF,HIGH);           //Ventilador estado OFF
+  
+  if(celsiusCold > 45){
+   if(celsiusCold>=80){
+    analogWrite(RefrigeracionLimite,255);               
+    /*Activacion de la refrigeracion de refuerzo para asi asegurar 
+     que no se destruyen por temepraruta los componentes de la instalacion*/
+   }else if(celsiusCold<=79){
+     analogWrite(RefrigeracionLimite,0);
+   }
+   
+   if(SetVentildor || tin45){
+    if(tin80 && !tin45){
+      countTHot++;
+      if(countTHot>=100){                                     
+      /* Contador estado i inicial/calentamiento celula Peltier*/
+          digitalWrite(VentiladorON,HIGH);                              
+          digitalWrite(VentiladorOFF,LOW);                    
+          digitalWrite(VentiladorTranscruso,LOW); 
+        delay(20);
+        if(celsiusCold>=77.5){                              // 3% <Tmax
+          analogWrite(pwmMotorRefr,255);                                
+        }else if(celsiusCold<=77.4 && celsiusCold>=45.6){   // 7.75% <Tmax
+          analogWrite(pwmMotorRefr,255);
+          digitalWrite(VentiladorON,LOW);                              
+          digitalWrite(VentiladorOFF,LOW);                    
+          digitalWrite(VentiladorTranscruso,HIGH);          
+        }else if(celsiusCold<=45.5){                        // 12.5% <Tmax
+          countTHot=0;
+          countTCold=0;
+          tin45=true;
+        }
+      }else if(tin45){
+        tin80=false;
+        digitalWrite(VentiladorOFF,LOW);
+        digitalWrite(VentiladorOFF,HIGH); 
+        digitalWrite(VentiladorTranscruso,LOW);
+        analogWrite(pwmMotorRefr,70);
+        countTCold++;
+        if(countTCold=100){
+          analogWrite(pwmMotorRefr,0);
+          tin45=false;
+        }
+      }
+    }
+    }else if(!SetVentildor){
+      digitalWrite(VentiladorON,LOW);
+      digitalWrite(VentiladorOFF,HIGH);
+      digitalWrite(VentiladorTranscruso,LOW);
+      analogWrite(pwmMotorRefr,0);
+      tin45=false;  
+      tin80=false;
+    }
+  }
+/*------------------------------------------------------------------------------*/
+
+
+/* ------- Estado alarma -------------------------------------------------------*/
+  statusAlarm(SetBotzina,celsiusCold);
+/*------------------------------------------------------------------------------*/
+
+
+/*------- Estat temperatrua cara fria ------------------------------------------*/    
+  if(celsiusHot<=25){                                     //  AzulCielo
+    Color(0,255,0);
+  }else if((celsiusHot>=26)&&(celsiusHot<=45)){           //  Verde
+    Color(255,0,0);
+  }else if((celsiusHot>=46)&&(celsiusHot<=65)){           //  Amarillo
+    Color(255,255,0);
+  }else if((celsiusHot>=67)&&(celsiusHot<=79)){           //  Llila
+    Color(255,0,255);
+  }else if(celsiusHot<=80){                               //  Rojo
+    Color(0,0,255);
+  }
+/*------------------------------------------------------------------------------*/
+
+/*------- Información Temperatura LCD ------------------------------------------*/
+  lcd.setCursor(0,0);
+  lcd.print("T HotSide :");
+  lcd.print(celsiusHot);
+  lcd.setCursor(0,1);
+  lcd.print("T ColdSide:");
+  lcd.print(celsiusCold);
+/*------------------------------------------------------------------------------*/
+
+/*------- Espera General  ------------------------------------------------------*/
+  delay(espera);
+/*------------------------------------------------------------------------------*/
+}
+
+
+/*==============================================================================*/
+/*===================== FUNCIONES Y METODOS ====================================*/
+/*==============================================================================*/
+/*----------------1.0 Change Color With Function -------------------------------*/
+void Color(int R, int G, int B)
+{
+  analogWrite(Red,R);      
+  analogWrite(Green,G);    
+  analogWrite(Blue,B);     
+}
+/*------------------------------------------------------------------------------*/
+/*--------------- 2.0 Automatical Activation of Ventilador ---------------------*/
+boolean SetTemperature(float Thot){
+
+  boolean activeVentildor = false;
+  if(!tin45 && ((Thot>=77.6) || tin80)){ 
+    tin80=true;                                 /*tiempo de inicio superado para 
+                                                  calentar la celula a 160ºC*/
+    tin45=false;
+    activeVentildor = true;
+  }else if((Thot<=45.6) && tin45){ 
+    activeVentildor = false;
+  }else{
+    activeVentildor = false;
+  }
+  return activeVentildor;
+}
+/*------------------------------------------------------------------------------*/
+/*-------------- 3.0 Automatic Activation of Temperature Alarm -----------------*/
+boolean SetStatusCelPertier(float Thot){
+
+  boolean activeBotzina = false;
+  if(Thot>=77.7){
+    activeBotzina = true;
+  }
+  return activeBotzina;
+}
+/*------------------------------------------------------------------------------*/
+
+/*-------- CONFIGURACION ALARMA-------------------------------------------------*/
+void statusAlarm(boolean temperaturaAlarma, int tempHot){
+  
+  if (temperaturaAlarma){
+    if(tempHot>=85){
+      digitalWrite(Alarm, HIGH);                    
+      delay(esperaBotzinaCritico);
+      digitalWrite(Alarm, LOW);                    
+      delay(esperaBotzinaCritico);
+      digitalWrite(Alarm, HIGH);                    
+      delay(esperaBotzinaCritico);
+      digitalWrite(Alarm, LOW);                    
+    }else if(tempHot>77.7 && tempHot<85){
+      digitalWrite(Alarm, HIGH);                    
+      delay(esperaBotzina);
+      digitalWrite(Alarm, LOW);                     
+      delay(esperaBotzina);
+      digitalWrite(Alarm, HIGH);                    
+      delay(esperaBotzina);
+      digitalWrite(Alarm, LOW);                      
+    }
+  }else if(tempHot>=200){
+    /*Activacio permanente de la bozina para su información de zona de peligro 
+    por destrución de componente celula peltier*/
+    digitalWrite(Alarm, HIGH);  
+  }else{
+    digitalWrite(Alarm, LOW);                     
+  }  
+}
+/*------------------------------------------------------------------------------*/
