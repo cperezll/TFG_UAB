@@ -23,7 +23,7 @@ title('Diferencia Temperatura Celula Pertier')
 grid on
 hold on
 
-fp = figure('Name','GraficaPotencia'); 
+fp = figure('Name','GraficaPotencia');
 ap = axes('XLim',[0 tmax],'YLim',[0 5]);
 l3 = line(nan,nan,'Color','g','LineWidth',2);
 
@@ -63,11 +63,11 @@ end
 clc;
 fprintf('%g s de captura a %g cap/s \n',t,i/t);
 
-%% Limpiar la escena del crimen
+%% Limpiar escenario
 fclose(s);
 delete(s);
 clear s;
 
 fclose(sp);
 delete(sp);
-clear sp;
+clear sp; 
