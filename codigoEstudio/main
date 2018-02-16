@@ -1,16 +1,15 @@
-/************************************************************************************/
-/************************************************************************************/
-/****************  TFG INGEIERIA ELECTRONICA DE TELECOMUNCACIONS  *******************/
-/****************         UNIVERSITAT ATONOMA DE BARCELONA        *******************/
-/************************************************************************************/
-/************************************************************************************/
+/**************************************************************************************/
+/**************************************************************************************/
+/****************  TFG INGEIERIA ELECTRONICA DE TELECOMUNCACIONS  *********************/
+/****************         UNIVERSITAT ATONOMA DE BARCELONA        *********************/
+/**************************************************************************************/
+/**************************************************************************************/
 /*
 Autor     : Cristian Perez Llurba
 DataInici : 22/10/2017
 DataFinal : 15/01/2018
 
 -- INDEX -------------------------------------------------------------------------
-
 ~ DESCRIPIO DE VARIABLES
   1. Libreriras
   2. Sensores
@@ -59,17 +58,18 @@ DataFinal : 15/01/2018
   13.0  Automatical Activation of Ventilador
   14.0  Automatic Activation of Temperature Alarm
   15.0  Configuración alarma 
----------------------------------------------------------------------------------
 
-/*================================================================================*/
-/*===================== DESCRIPIO DE VARIABLES ===================================*/
-/*================================================================================*/
-/* 1.0 Libreriras
+/*==============================================================================*/
+/*===================== DESCRIPIO DE VARIABLES =================================*/
+/*==============================================================================*/
+
+  /* 1. Libreriras
   Libreries necesaries per aquest projecte Harbesten*/
   #include <math.h>
   #include <Wire.h> 
   #include <LiquidCrystal_I2C.h>
   #include <TimerOne.h>
+  
   /* 2. Sensores
   /* 2.0 Entradas analogicas de los sensores*/ 
   const int R1hot                 = 10000;         //Valor de la resistencia
@@ -129,17 +129,13 @@ DataFinal : 15/01/2018
 
 /*8. Regrifaracion cara caliente*/
   const int RefrigeracionLimite   = 5;              // Refrigeracion EXTREMA para no superar los 70ºC 
-    
-  const int espera                = 500;
-  const int esperaBotzina         = 50;
-  const int esperaBotzinaCritico  = 100;
-/*================================================================================*/
 
 /*9. Tiempos de espera */    
   const int espera                = 500;            // Tiempo de espera del programa general
   const int esperaBotzina         = 50;             // Tiempo de espera bozina no critica
   const int esperaBotzinaCritico  = 100;            // Tiempo de espera bozina critica
   const int timeLed               = 20;             // Tiempo de espera de los LED's
+
 /*==============================================================================*/
 
 /*==============================================================================*/
@@ -181,7 +177,6 @@ void setup()
     /*10.3.6. Inicializacion del LCD*/
       lcd.init();                                   // Inicializamos el lcd
       lcd.backlight();                              // Activación luz lcd
-}
 
 /*==============================================================================*/
 /*========================== Programa Principal ================================*/
@@ -189,12 +184,14 @@ void setup()
 /*11.1. Programa Principal (main)*/ 
 void loop(){
 /*------- 11.1.1 Tension salida celula Peltier ---------------------------------*/  
+
   float rawPer    = analogRead(SensorPeltier);
   float VPerTest  = (rawPer/1024*Vcc);
   int   VPer      = VPerTest*100; 
-/*------------------------------------------------------------------------------*/  
+/*-------------------------------------------------------------------------------*/  
 
-/*------- 11.1.2 Parametros de los sensores ------------------------------------*/    
+
+/*------- 11.1.2 Parametros de los sensores -------------------------------------*/    
 
   float rawHot    = analogRead(SensorFaceHot);
   float Vhot      =  rawHot / 1024 * Vcc;
@@ -222,12 +219,14 @@ void loop(){
 /*------- 11.1.3 Sensor Temepratura Refrigeración -----------------------------*/
 lecturaDisipador = analogRead(SensorRadiador);      //Lectura del sensor en un rango de 0 a 1023
 
+
+/*------- 11.1.3 Sensor Temepratura Refrigeración -----------------------------*/
+lecturaDisipador = analogRead(SensorRadiador);      //Lectura del sensor en un rango de 0 a 1023
 voltajeLecturaDisipador = 5.0 / 1024 * lecturaDisipador;
 tempDisipador = voltajeLecturaDisipador * 100;
-/*------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------*/
 
-/*------- 11.1.4 Informacion bus serie ----------------------------------------*/
-
+/*------- 11.1.4 Informacion bus serie -----------------------------------------*/
   Serial.print(celsiusHotADC);
   Serial.print(",");
   Serial.print(celsiusColdADC);
@@ -306,6 +305,7 @@ tempDisipador = voltajeLecturaDisipador * 100;
 /*------------------------------------------------------------------------------*/
 
 /*------- 11.1.7 Estat temperatrua cara fria -----------------------------------*/    
+
   if(celsiusHot<=25){                                     //  AzulCielo
     Color(0,255,0);
   }else if((celsiusHot>=26)&&(celsiusHot<=45)){           //  Verde
@@ -319,7 +319,7 @@ tempDisipador = voltajeLecturaDisipador * 100;
   }
 /*------------------------------------------------------------------------------*/
 
-/*------- 11.1.8 Información Temperatura LCD -----------------------------------*/
+/*------- 11.1.8 Información Temperatura LCD ------------------------------------*/
   lcd.setCursor(0,0);
   lcd.print("T HotSide :");
   lcd.print(celsiusHot);
@@ -328,7 +328,7 @@ tempDisipador = voltajeLecturaDisipador * 100;
   lcd.print(celsiusCold);
 /*------------------------------------------------------------------------------*/
 
-/*------- 11.1.9 Espera General  -----------------------------------------------*/
+/*------- 11.1.9 Espera General  ------------------------------------------------*/
   delay(espera);
 /*------------------------------------------------------------------------------*/
 }
