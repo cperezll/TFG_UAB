@@ -1,0 +1,73 @@
+%borrar previos
+delete(instrfind({'Port'},{'COM8'}));
+
+%crear objeto serie
+s = serial('COM8','BaudRate',9600,'Terminator','CR/LF');
+sp = serial('COM8','BaudRate',9600,'Terminator','CR/LF');
+warning('off','MATLAB:serial:fscanf:unsuccessfulRead');
+%abrir puerto
+fopen(s);
+    
+% parámetros de medidas
+tmax = 10000; % tiempo de captura en s
+rate = 0.88; % resultado experimental (comprobar)
+
+% preparar la figura
+f = figure('Name','GraficaTemperatura');
+a = axes('XLim',[0   tmax],'YLim',[0 205]);
+l1 = line(nan,nan,'Color','r','LineWidth',2);
+l2 = line(nan,nan,'Color','b','LineWidth',2);
+xlabel('Tiempo (s)')
+ylabel('Temperatura (ºC)')
+title('Diferencia Temperatura Celula Pertier')
+grid on
+hold on
+
+fp = figure('Name','GraficaPotencia');
+ap = axes('XLim',[0 tmax],'YLim',[0 5]);
+l3 = line(nan,nan,'Color','g','LineWidth',2);
+
+xlabel('Tiempo (s)')
+ylabel('Tensión (V)')
+title('Ganancia celula Peltier')
+grid on
+hold on
+
+% inicializar
+v1 = zeros(1,tmax*rate);
+v2 = zeros(1,tmax*rate);
+v3 = zeros(1,tmax*rate);
+i = 1;
+t = 0;
+
+% ejecutar bucle cronometrado
+tic
+while t<tmax
+    t = toc;
+    % leer del puerto serie
+    a = fscanf(s,'%d,%d,%d');
+    ap = fscanf(s,'%d,%d,%d');
+    v1(i)=a(1)/100;
+    v2(i)=a(2)/100;
+    v3(i)=ap(3)/100;
+    % dibujar en la figura
+    x = linspace(0,i/rate,i);
+    set(l1,'YData',v1(1:i),'XData',x);
+    set(l2,'YData',v2(1:i),'XData',x);
+    set(l3,'YData',v3(1:i),'XData',x);
+    drawnow
+    % seguir
+    i = i+1;
+end
+% resultado del cronometro
+clc;
+fprintf('%g s de captura a %g cap/s \n',t,i/t);
+
+%% Limpiar escenario
+fclose(s);
+delete(s);
+clear s;
+
+fclose(sp);
+delete(sp);
+clear sp; 
